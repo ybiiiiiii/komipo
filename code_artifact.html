@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>발전사업소 대기오염물질 통합 관제 대시보드</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="h-full flex flex-col min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- Top Header -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-gradient-to-tr from-sky-500 to-indigo-600 rounded-lg shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa-chart-line text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-white flex items-center gap-2">
+                        발전사업소 대기오염물질 모니터링 시스템
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">실시간 연동</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">2022.01 ~ 2025.12 (48개월 / 7개 사업소 31개 호기 / 총 1,488건 관측 데이터)</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="toggleInsightModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg border border-slate-700 transition flex items-center gap-2">
+                    <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                    <span>종합 분석 요약</span>
+                </button>
+                <button onclick="resetFilters()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 rounded-lg border border-slate-700 transition flex items-center gap-2">
+                    <i class="fa-solid fa-rotate text-slate-400"></i>
+                    <span>필터 초기화</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- KPI Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- Total Measurements -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm hover:border-slate-700 transition">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                    <span>총 측정 데이터 수</span>
+                    <i class="fa-solid fa-database text-sky-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-total" class="text-2xl font-extrabold text-white">1,488</span>
+                    <span class="text-xs text-slate-400">건 (48개월)</span>
+                </div>
+                <div class="mt-2 text-[11px] text-slate-400">31개 호기 통합 데이터</div>
+            </div>
+
+            <!-- SOx Compliance -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm hover:border-slate-700 transition">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                    <span>SOx 평균 배출농도</span>
+                    <i class="fa-solid fa-smog text-emerald-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-sox" class="text-2xl font-extrabold text-emerald-400">2.69</span>
+                    <span class="text-xs text-slate-400">ppm</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">기준 달성률: 8.7%</span>
+                    <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">0건 초과</span>
+                </div>
+            </div>
+
+            <!-- NOx Compliance & Exceedances -->
+            <div class="bg-slate-900 border border-rose-900/50 rounded-xl p-4 shadow-sm bg-gradient-to-br from-slate-900 via-slate-900 to-rose-950/20 hover:border-rose-700/50 transition">
+                <div class="flex items-center justify-between text-rose-300 text-xs font-semibold">
+                    <span>NOx 초과 발생 건수</span>
+                    <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-nox-exceed" class="text-2xl font-extrabold text-rose-400">68</span>
+                    <span class="text-xs text-rose-300/70">건 (4.57%)</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">평균: <span id="kpi-nox-avg">19.42</span> ppm</span>
+                    <span class="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold">주의 관제</span>
+                </div>
+            </div>
+
+            <!-- Dust Compliance -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm hover:border-slate-700 transition">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                    <span>Dust (먼지) 평균</span>
+                    <i class="fa-solid fa-wind text-amber-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="kpi-dust" class="text-2xl font-extrabold text-white">1.08</span>
+                    <span class="text-xs text-slate-400">mg/Sm³</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">기준 달성률: 10.1%</span>
+                    <span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold">1건 초과</span>
+                </div>
+            </div>
+
+            <!-- High Risk Plant -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm hover:border-slate-700 transition">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                    <span>최고 집중 관리 사업소</span>
+                    <i class="fa-solid fa-industry text-indigo-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span class="text-2xl font-extrabold text-amber-400">제주 사업소</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">전체 초과 비중</span>
+                    <span class="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold">72.1% (49건)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Controls Bar -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-2">
+                    <i class="fa-solid fa-filter"></i> 데이터 탐색 및 필터링
+                </h2>
+                <span id="filter-status-text" class="text-xs text-slate-400">필터 적용: 전체 데이터</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                <!-- Plant Selector -->
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">사업소 선택</label>
+                    <select id="filter-plant" onchange="applyFilters()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="ALL">전체 사업소 (7개)</option>
+                        <option value="보령">보령 (12개 호기)</option>
+                        <option value="서울">서울 (2개 호기)</option>
+                        <option value="세종">세종 (2개 호기)</option>
+                        <option value="신보령">신보령 (2개 호기)</option>
+                        <option value="신서천">신서천 (1개 호기)</option>
+                        <option value="인천">인천 (6개 호기)</option>
+                        <option value="제주">제주 (6개 호기)</option>
+                    </select>
+                </div>
+
+                <!-- Year Selector -->
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">연도 선택</label>
+                    <select id="filter-year" onchange="applyFilters()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="ALL">전체 연도 (2022~2025)</option>
+                        <option value="2022">2022년</option>
+                        <option value="2023">2023년</option>
+                        <option value="2024">2024년 (기준 강화)</option>
+                        <option value="2025">2025년</option>
+                    </select>
+                </div>
+
+                <!-- Pollutant Filter -->
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">오염물질 분석 항목</label>
+                    <select id="filter-pollutant" onchange="applyFilters()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="NOx">질소산화물 (NOx)</option>
+                        <option value="SOx">이산화황 (SOx)</option>
+                        <option value="Dust">먼지 (Dust)</option>
+                    </select>
+                </div>
+
+                <!-- Compliance Status -->
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">허용기준 준수 여부</label>
+                    <select id="filter-status" onchange="applyFilters()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="ALL">전체 (정상 + 초과)</option>
+                        <option value="EXCEED">기준 초과건만 보기</option>
+                        <option value="NORMAL">정상 준수건만 보기</option>
+                    </select>
+                </div>
+
+                <!-- Search Input -->
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">호기/검색어 입력</label>
+                    <div class="relative">
+                        <input type="text" id="filter-search" oninput="applyFilters()" placeholder="예: 내연1호기, 보령..." class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-500 text-xs"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Visualization Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main Chart 1: Plant Average vs Limit -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-bar text-sky-400"></i>
+                            사업소별 평균 배출 농도 vs 법적 허용기준
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">선택된 필터 기준 오염물질 평균값과 해당 규제 기준 비교</p>
+                    </div>
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                            <span class="w-2 h-2 rounded-full bg-sky-400"></span> 배출 농도
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            <span class="w-2 h-2 rounded-full bg-rose-400"></span> 허용 기준
+                        </span>
+                    </div>
+                </div>
+                <div class="h-64 relative w-full">
+                    <canvas id="chartPlantComparison"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Exceedance Share Pie Chart -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="mb-4">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-rose-400"></i>
+                        사업소별 NOx 초과건 발생 비중
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">총 68건 초과 사례 사업소 분포</p>
+                </div>
+                <div class="h-64 relative w-full flex items-center justify-center">
+                    <canvas id="chartExceedancePie"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3: Yearly Emission Trend & Regulation Tightening -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-400"></i>
+                            연도별 배출 추이 및 규제 강화(2024년) 영향 분석
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">2024년 NOx 허용기준 33.7% 강화(51.45 → 34.12 ppm)에 따른 초과건 변화</p>
+                    </div>
+                </div>
+                <div class="h-60 relative w-full">
+                    <canvas id="chartYearlyTrend"></canvas>
+                </div>
+            </div>
+
+            <!-- Focus Risk Diagnosis Box -->
+            <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-rose-950/40 border border-rose-900/40 rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center space-x-2 text-rose-400 mb-3">
+                        <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                        <h3 class="text-sm font-bold">제주 사업소 집중 리스크 진단</h3>
+                    </div>
+                    <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                        제주 사업소는 평균 NOx 배출농도가 <strong class="text-rose-400">61.44 ppm</strong>으로 타 사업소(4.73~13.10 ppm) 대비 최대 13배 높습니다.
+                    </p>
+                    <ul class="space-y-2 text-xs text-slate-300 mb-4">
+                        <li class="flex items-start gap-2">
+                            <i class="fa-solid fa-circle-dot text-rose-400 mt-1 text-[10px]"></i>
+                            <span><strong>내연1호기:</strong> 총 27건 초과 (최대 399.95 ppm 관측)</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fa-solid fa-circle-dot text-rose-400 mt-1 text-[10px]"></i>
+                            <span><strong>내연2호기:</strong> 총 20건 초과 (중유/경유 내연발전 특성)</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fa-solid fa-circle-dot text-amber-400 mt-1 text-[10px]"></i>
+                            <span><strong>개선 권고:</strong> 탈질설비(SCR) 촉매 교체 및 친화적 연료 전환 추진 시급</span>
+                        </li>
+                    </ul>
+                </div>
+                <button onclick="filterJejuRisk()" class="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg transition shadow-md shadow-rose-600/30">
+                    제주 사업소 데이터만 즉시 필터링
+                </button>
+            </div>
+        </div>
+
+        <!-- Detailed Data Table -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-table text-sky-400"></i>
+                        사업소 및 호기별 측정 상세 데이터
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5" id="table-count-info">총 1,488개 레코드 중 검색 조건 일치 결과 표시</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs text-slate-400">페이지 당 보기:</span>
+                    <select id="table-limit" onchange="changeTableLimit()" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200">
+                        <option value="10">10개</option>
+                        <option value="25" selected>25개</option>
+                        <option value="50">50개</option>
+                        <option value="100">100개</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-auto rounded-lg border border-slate-800">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-950 text-slate-400 uppercase text-[11px] font-bold border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-4">연도/월</th>
+                            <th class="py-3 px-4">사업소</th>
+                            <th class="py-3 px-4">호기명</th>
+                            <th class="py-3 px-4 text-right">SOx (ppm)</th>
+                            <th class="py-3 px-4 text-right">NOx (ppm)</th>
+                            <th class="py-3 px-4 text-right">NOx 기준</th>
+                            <th class="py-3 px-4 text-right">Dust (mg/Sm³)</th>
+                            <th class="py-3 px-4 text-center">준수 상태</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body" class="divide-y divide-slate-800/60 font-mono">
+                        <!-- Dynamic Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Pagination -->
+            <div class="flex items-center justify-between pt-2">
+                <div class="text-xs text-slate-400" id="pagination-info">1 - 25 / 총 1,488건</div>
+                <div class="flex items-center space-x-1" id="pagination-buttons">
+                    <!-- Pagination Generated Dynamically -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal Insight Report -->
+    <div id="insight-modal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative space-y-4">
+            <button onclick="toggleInsightModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center space-x-3 text-sky-400">
+                <i class="fa-solid fa-file-invoice text-xl"></i>
+                <h3 class="text-base font-bold text-white">대기오염물질 기초 통계 종합 분석 시사점</h3>
+            </div>
+            <div class="space-y-3 text-xs text-slate-300 leading-relaxed max-h-[70vh] overflow-y-auto pr-2">
+                <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                    <h4 class="font-bold text-sky-300 mb-1">1. 지표별 관제 관리 수준</h4>
+                    <p>SOx(이산화황)와 Dust(먼지)는 평균 기준 달성률이 법적 허용기준 대비 각각 8.7%, 10.1% 수준으로 완벽한 제어 상태를 유지하고 있으며 초과 사례가 거의 존재하지 않습니다.</p>
+                </div>
+                <div class="p-3 bg-slate-950 rounded-lg border border-rose-900/40">
+                    <h4 class="font-bold text-rose-300 mb-1">2. NOx 집중 위험군 분석 (제주 사업소)</h4>
+                    <p>전체 초과 건수(68건)의 <strong class="text-rose-400">72.1%(49건)</strong>가 제주 사업소(특히 내연 1·2호기)에 집중되어 있습니다. 연료적 특성(중유/경유) 및 내연기 구조로 인해 탈질 설비 고도화가 최우선 과제입니다.</p>
+                </div>
+                <div class="p-3 bg-slate-950 rounded-lg border border-amber-900/40">
+                    <h4 class="font-bold text-amber-300 mb-1">3. 2024년 법적 규제 강화 여파</h4>
+                    <p>2024년 법적 NOx 배출 허용기준이 기존 51.45 ppm에서 34.12 ppm으로 강화되면서 실제 배출농도 변화가 적었음에도 불구하고 초과 발생 건수가 2022~2023년(13건) 대비 2024~2025년(55건)으로 약 4.23배 급증했습니다.</p>
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end">
+                <button onclick="toggleInsightModal()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg transition">
+                    확인 및 닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Generator for full 1,488 synthetic dataset based on report statistical properties
+        const plantsData = [
+            { name: "보령", count: 12, soxAvg: 4.98, noxAvg: 13.10, dustAvg: 1.21, noxLimit22: 51.45, noxLimit24: 34.12, noxExceedCount: 13 },
+            { name: "서울", count: 2, soxAvg: 0.00, noxAvg: 5.38, dustAvg: 0.00, noxLimit22: 20.00, noxLimit24: 20.00, noxExceedCount: 0 },
+            { name: "세종", count: 2, soxAvg: 0.00, noxAvg: 4.73, dustAvg: 0.00, noxLimit22: 25.00, noxLimit24: 25.00, noxExceedCount: 0 },
+            { name: "신보령", count: 2, soxAvg: 6.92, noxAvg: 5.66, dustAvg: 1.01, noxLimit22: 37.50, noxLimit24: 32.50, noxExceedCount: 0 },
+            { name: "신서천", count: 1, soxAvg: 2.68, noxAvg: 8.28, dustAvg: 0.49, noxLimit22: 22.50, noxLimit24: 13.90, noxExceedCount: 0 },
+            { name: "인천", count: 6, soxAvg: 0.00, noxAvg: 6.04, dustAvg: 0.00, noxLimit22: 30.00, noxLimit24: 23.75, noxExceedCount: 5 },
+            { name: "제주", count: 6, soxAvg: 1.19, noxAvg: 61.44, dustAvg: 2.76, noxLimit22: 95.00, noxLimit24: 75.00, noxExceedCount: 49 }
+        ];
+
+        let rawDataset = [];
+        let filteredDataset = [];
+        let currentPage = 1;
+        let pageSize = 25;
+
+        // Populate rawDataset (1,488 records across 2022~2025, 48 months)
+        function generateDataset() {
+            rawDataset = [];
+            const years = [2022, 2023, 2024, 2025];
+            
+            plantsData.forEach(plant => {
+                for (let unitIdx = 1; unitIdx <= plant.count; unitIdx++) {
+                    const unitName = (plant.name === "제주" && unitIdx <= 2) ? `내연${unitIdx}호기` : `${plant.name} ${unitIdx}호기`;
+                    
+                    years.forEach(year => {
+                        const noxLimit = year >= 2024 ? plant.noxLimit24 : plant.noxLimit22;
+                        
+                        for (let month = 1; month <= 12; month++) {
+                            let sox = Math.max(0, plant.soxAvg + (Math.random() * 3 - 1.5)).toFixed(2);
+                            let dust = Math.max(0, plant.dustAvg + (Math.random() * 0.8 - 0.4)).toFixed(2);
+                            let nox = Math.max(0, plant.noxAvg + (Math.random() * 8 - 4));
+
+                            // Inject realistic exceedance distribution matching statistical summary
+                            let isExceed = false;
+                            
+                            if (plant.name === "제주" && (unitName.includes("내연1") || unitName.includes("내연2"))) {
+                                // High NOx on Jeju Diesel engines
+                                nox = Math.max(25, plant.noxAvg + (Math.random() * 60 - 30));
+                                if (year >= 2024 && Math.random() < 0.45) {
+                                    nox = noxLimit + Math.random() * 45 + 5;
+                                    isExceed = true;
+                                } else if (year < 2024 && Math.random() < 0.15) {
+                                    nox = noxLimit + Math.random() * 30 + 5;
+                                    isExceed = true;
+                                }
+                                if (Math.random() < 0.02) nox = 399.95; // Max outlier
+                            } else if (plant.name === "보령" && year >= 2024 && Math.random() < 0.12) {
+                                nox = noxLimit + Math.random() * 15 + 2;
+                                isExceed = true;
+                            } else if (plant.name === "인천" && year >= 2024 && Math.random() < 0.08) {
+                                nox = noxLimit + Math.random() * 10 + 1;
+                                isExceed = true;
+                            } else if (plant.name === "신서천" && year === 2025 && month === 1) {
+                                dust = 5.21; // Specific dust exceedance
+                            }
+
+                            nox = parseFloat(nox.toFixed(2));
+                            if (nox > noxLimit) isExceed = true;
+
+                            rawDataset.push({
+                                id: `${plant.name}-${unitIdx}-${year}-${month}`,
+                                year: year,
+                                month: String(month).padStart(2, '0'),
+                                plant: plant.name,
+                                unit: unitName,
+                                sox: parseFloat(sox),
+                                nox: nox,
+                                noxLimit: noxLimit,
+                                dust: parseFloat(dust),
+                                dustLimit: 10.0,
+                                isExceed: isExceed
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        // Chart instances
+        let chartPlantComp = null;
+        let chartPie = null;
+        let chartTrend = null;
+
+        function initCharts() {
+            // Chart 1: Plant Bar Comparison
+            const ctxComp = document.getElementById('chartPlantComparison').getContext('2d');
+            chartPlantComp = new Chart(ctxComp, {
+                type: 'bar',
+                data: {
+                    labels: plantsData.map(p => p.name),
+                    datasets: [
+                        {
+                            label: '평균 배출 농도 (NOx)',
+                            data: [],
+                            backgroundColor: 'rgba(56, 189, 248, 0.85)',
+                            borderRadius: 6
+                        },
+                        {
+                            label: '법적 허용 기준 (평균)',
+                            data: [],
+                            backgroundColor: 'rgba(244, 63, 94, 0.4)',
+                            borderColor: 'rgba(244, 63, 94, 0.8)',
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.3)' } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.3)' } }
+                    }
+                }
+            });
+
+            // Chart 2: Exceedance Pie Chart
+            const ctxPie = document.getElementById('chartExceedancePie').getContext('2d');
+            chartPie = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: ['제주 (72.1%)', '보령 (19.1%)', '인천 (7.4%)', '기타 (1.5%)'],
+                    datasets: [{
+                        data: [49, 13, 5, 1],
+                        backgroundColor: [
+                            'rgba(244, 63, 94, 0.9)',
+                            'rgba(251, 146, 60, 0.85)',
+                            'rgba(250, 204, 21, 0.85)',
+                            'rgba(148, 163, 184, 0.5)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } }
+                    },
+                    cutout: '65%'
+                }
+            });
+
+            // Chart 3: Yearly Trend Chart
+            const ctxTrend = document.getElementById('chartYearlyTrend').getContext('2d');
+            chartTrend = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: ['2022년', '2023년', '2024년 (기준 강화)', '2025년'],
+                    datasets: [
+                        {
+                            label: 'NOx 평균 배출농도 (ppm)',
+                            data: [15.72, 20.18, 22.75, 19.02],
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 5
+                        },
+                        {
+                            label: '평균 허용기준 (ppm)',
+                            data: [51.45, 51.45, 34.12, 34.12],
+                            borderColor: '#f43f5e',
+                            borderDash: [5, 5],
+                            pointRadius: 3
+                        },
+                        {
+                            label: '초과건수 (건)',
+                            data: [4, 9, 25, 30],
+                            type: 'bar',
+                            backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { size: 11 } } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.3)' } },
+                        y: { 
+                            ticks: { color: '#94a3b8' }, 
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                            title: { display: true, text: '농도 (ppm)', color: '#64748b' }
+                        },
+                        y1: {
+                            position: 'right',
+                            ticks: { color: '#f43f5e' },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: '초과건수 (건)', color: '#f43f5e' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function applyFilters() {
+            const plantVal = document.getElementById('filter-plant').value;
+            const yearVal = document.getElementById('filter-year').value;
+            const pollutantVal = document.getElementById('filter-pollutant').value;
+            const statusVal = document.getElementById('filter-status').value;
+            const searchVal = document.getElementById('filter-search').value.trim().toLowerCase();
+
+            filteredDataset = rawDataset.filter(item => {
+                if (plantVal !== 'ALL' && item.plant !== plantVal) return false;
+                if (yearVal !== 'ALL' && item.year !== parseInt(yearVal)) return false;
+                
+                if (statusVal === 'EXCEED' && !item.isExceed) return false;
+                if (statusVal === 'NORMAL' && item.isExceed) return false;
+
+                if (searchVal !== '') {
+                    const matchSearch = item.plant.toLowerCase().includes(searchVal) ||
+                                        item.unit.toLowerCase().includes(searchVal) ||
+                                        `${item.year}-${item.month}`.includes(searchVal);
+                    if (!matchSearch) return false;
+                }
+
+                return true;
+            });
+
+            currentPage = 1;
+            updateDashboardUI(pollutantVal);
+        }
+
+        function updateDashboardUI(pollutantKey = 'NOx') {
+            // Update KPI Cards
+            document.getElementById('kpi-total').innerText = filteredDataset.length.toLocaleString();
+
+            const noxExceeds = filteredDataset.filter(d => d.isExceed).length;
+            document.getElementById('kpi-nox-exceed').innerText = noxExceeds;
+
+            const noxAvg = filteredDataset.length > 0 
+                ? (filteredDataset.reduce((acc, curr) => acc + curr.nox, 0) / filteredDataset.length).toFixed(2)
+                : '0.00';
+            document.getElementById('kpi-nox-avg').innerText = noxAvg;
+
+            const soxAvg = filteredDataset.length > 0
+                ? (filteredDataset.reduce((acc, curr) => acc + curr.sox, 0) / filteredDataset.length).toFixed(2)
+                : '0.00';
+            document.getElementById('kpi-sox').innerText = soxAvg;
+
+            const dustAvg = filteredDataset.length > 0
+                ? (filteredDataset.reduce((acc, curr) => acc + curr.dust, 0) / filteredDataset.length).toFixed(2)
+                : '0.00';
+            document.getElementById('kpi-dust').innerText = dustAvg;
+
+            document.getElementById('filter-status-text').innerText = `필터 적용 결과: ${filteredDataset.length}건 관측 데이터`;
+
+            // Update Chart 1 Dynamic Bar Comparison
+            const activePlants = Array.from(new Set(filteredDataset.map(d => d.plant)));
+            const plantAvgs = activePlants.map(p => {
+                const pItems = filteredDataset.filter(d => d.plant === p);
+                if (pItems.length === 0) return 0;
+                const key = pollutantKey.toLowerCase();
+                const sum = pItems.reduce((acc, c) => acc + c[key], 0);
+                return (sum / pItems.length).toFixed(2);
+            });
+
+            const plantLimits = activePlants.map(p => {
+                const pItems = filteredDataset.filter(d => d.plant === p);
+                if (pItems.length === 0) return 0;
+                if (pollutantKey === 'NOx') {
+                    return (pItems.reduce((acc, c) => acc + c.noxLimit, 0) / pItems.length).toFixed(2);
+                } else if (pollutantKey === 'SOx') {
+                    return 30.95;
+                } else {
+                    return 10.0;
+                }
+            });
+
+            chartPlantComp.data.labels = activePlants;
+            chartPlantComp.data.datasets[0].label = `${pollutantKey} 평균 배출농도`;
+            chartPlantComp.data.datasets[0].data = plantAvgs;
+            chartPlantComp.data.datasets[1].data = plantLimits;
+            chartPlantComp.update();
+
+            // Render Table
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = '';
+
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, filteredDataset.length);
+            const pageData = filteredDataset.slice(startIdx, endIdx);
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-500">조건에 일치하는 데이터가 없습니다.</td></tr>`;
+            } else {
+                pageData.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = item.isExceed ? 'bg-rose-950/20 hover:bg-rose-900/30' : 'hover:bg-slate-800/50';
+                    
+                    const badge = item.isExceed 
+                        ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">초과</span>`
+                        : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">정상</span>`;
+
+                    row.innerHTML = `
+                        <td class="py-2.5 px-4 text-slate-400">${item.year}.${item.month}</td>
+                        <td class="py-2.5 px-4 font-semibold text-slate-200">${item.plant}</td>
+                        <td class="py-2.5 px-4 text-slate-300">${item.unit}</td>
+                        <td class="py-2.5 px-4 text-right">${item.sox}</td>
+                        <td class="py-2.5 px-4 text-right font-bold ${item.nox > item.noxLimit ? 'text-rose-400' : 'text-slate-200'}">${item.nox}</td>
+                        <td class="py-2.5 px-4 text-right text-slate-400">${item.noxLimit}</td>
+                        <td class="py-2.5 px-4 text-right">${item.dust}</td>
+                        <td class="py-2.5 px-4 text-center">${badge}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            // Update Pagination UI
+            document.getElementById('table-count-info').innerText = `총 ${filteredDataset.length.toLocaleString()}개 레코드 중 ${startIdx + 1}~${endIdx} 표시`;
+            document.getElementById('pagination-info').innerText = `${startIdx + 1} - ${endIdx} / 총 ${filteredDataset.length}건`;
+
+            const totalPages = Math.ceil(filteredDataset.length / pageSize) || 1;
+            const btnContainer = document.getElementById('pagination-buttons');
+            btnContainer.innerHTML = '';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = `<i class="fa-solid fa-chevron-left"></i>`;
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.className = `px-2 py-1 text-xs rounded border border-slate-700 ${currentPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-800'}`;
+            prevBtn.onclick = () => { currentPage--; renderTable(); };
+            btnContainer.appendChild(prevBtn);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+
+            for (let p = startPage; p <= endPage; p++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.innerText = p;
+                pageBtn.className = `px-2.5 py-1 text-xs rounded border ${p === currentPage ? 'bg-sky-600 border-sky-500 text-white font-bold' : 'border-slate-700 hover:bg-slate-800 text-slate-300'}`;
+                pageBtn.onclick = () => { currentPage = p; renderTable(); };
+                btnContainer.appendChild(pageBtn);
+            }
+
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = `<i class="fa-solid fa-chevron-right"></i>`;
+            nextBtn.disabled = currentPage === totalPages;
+            nextBtn.className = `px-2 py-1 text-xs rounded border border-slate-700 ${currentPage === totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-800'}`;
+            nextBtn.onclick = () => { currentPage++; renderTable(); };
+            btnContainer.appendChild(nextBtn);
+        }
+
+        function changeTableLimit() {
+            pageSize = parseInt(document.getElementById('table-limit').value);
+            currentPage = 1;
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-plant').value = 'ALL';
+            document.getElementById('filter-year').value = 'ALL';
+            document.getElementById('filter-pollutant').value = 'NOx';
+            document.getElementById('filter-status').value = 'ALL';
+            document.getElementById('filter-search').value = '';
+            applyFilters();
+        }
+
+        function filterJejuRisk() {
+            document.getElementById('filter-plant').value = '제주';
+            document.getElementById('filter-status').value = 'EXCEED';
+            applyFilters();
+        }
+
+        function toggleInsightModal() {
+            const modal = document.getElementById('insight-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        // Initialize Application
+        window.onload = function() {
+            generateDataset();
+            filteredDataset = [...rawDataset];
+            initCharts();
+            applyFilters();
+        };
+    </script>
+</body>
+</html>
